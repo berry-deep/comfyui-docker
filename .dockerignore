@@ -1,0 +1,22 @@
+# Keep the build context small: nothing here is needed inside the image.
+.git
+.github
+.gitignore
+.dockerignore
+.claude
+*.md
+*.txt.bak
+build/
+dist/
+.venv/
+__pycache__/
+*.pyc
+*.tar
+*.tar.gz
+*.log
+
+# Runtime data that must never be baked into the image
+models/
+output/
+input/
+custom_nodes/*/models/

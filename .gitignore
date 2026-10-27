@@ -1,0 +1,17 @@
+# Local build artifacts (kept on D: on purpose)
+.buildcache/
+.docker/
+dist/
+*.tar
+*.tar.gz
+*.log
+
+# Local runtime data
+models/
+output/
+input/
+
+# Python
+__pycache__/
+*.pyc
+.venv/

@@ -1,0 +1,10 @@
+# Keep the repository LF-only: Dockerfile line continuations ("\") and GitHub
+# Actions YAML behave predictably only with LF endings.
+* text=auto eol=lf
+
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+.gitignore text eol=lf
