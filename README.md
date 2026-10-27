@@ -135,6 +135,25 @@ GitHub 仓库 → **Actions** → **Build ComfyUI Image** → **Run workflow**�
 
 5. 之后在 Clore.ai 上单时直接填这个地址即可，无需再配置 registry 凭证。
 
+也可以用命令行完成第 3 步（需要一个带 `write:packages` 权限的 PAT，
+Git Credential Manager 保存的 token 只有 `repo/gist/workflow`，改不了可见性）：
+
+```bash
+curl -X PATCH \
+  -H "Authorization: Bearer <PAT>" \
+  -H "Accept: application/vnd.github+json" \
+  -d '{"visibility":"public"}' \
+  https://api.github.com/user/packages/container/<repo-name>
+```
+
+验证是否已公开（返回 `200` 即公开，`401` 仍是私有）：
+
+```bash
+curl -o /dev/null -w '%{http_code}\n' \
+  -H "Accept: application/vnd.oci.image.index.v1+json" \
+  https://ghcr.io/v2/<owner>/<repo>/manifests/latest
+```
+
 ---
 
 ## 6. Clore.ai 下单配置
