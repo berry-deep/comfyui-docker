@@ -70,12 +70,23 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       # GHCR requires a lowercase repository name: owner/repo -> owner/repo
-      - name: Resolve image name
+      # NOTE: the tags are computed here on purpose. docker/metadata-action has
+      # no `date` tag type (v5 and v6 only know ref/pr/semver/match/sha/raw/
+      # pep440/latest/edge/schedule), so the YYYYMMDD tag is built manually.
+      - name: Resolve image name and tags
         id: names
         run: |
+          set -euo pipefail
           repo="${GITHUB_REPOSITORY,,}"
-          echo "repo=${repo}" >> "$GITHUB_OUTPUT"
-          echo "image=${REGISTRY}/${repo}" >> "$GITHUB_OUTPUT"
+          image="${REGISTRY}/${repo}"
+          short_sha="${GITHUB_SHA::7}"
+          date_tag="$(date -u +%Y%m%d)"
+          tags="${image}:latest,${image}:${date_tag},${image}:${short_sha}"
+          echo "repo=${repo}"              >> "$GITHUB_OUTPUT"
+          echo "image=${image}"            >> "$GITHUB_OUTPUT"
+          echo "short_sha=${short_sha}"    >> "$GITHUB_OUTPUT"
+          echo "date_tag=${date_tag}"      >> "$GITHUB_OUTPUT"
+          echo "tags=${tags}"              >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -84,15 +95,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Fail fast (and with a readable message) if the base image tag is wrong,
+      # instead of dying inside the build with a "manifest unknown" error.
+      - name: Verify base image
+        run: |
+          set -euo pipefail
+          if docker manifest inspect cloreai/jupyter:ubuntu24.04-v2 > /dev/null 2>&1; then
+            echo "base image OK: cloreai/jupyter:ubuntu24.04-v2"
+          else
+            echo "::error::base image cloreai/jupyter:ubuntu24.04-v2 not found on Docker Hub"
+            echo "::error::check the available tags: https://hub.docker.com/r/cloreai/jupyter/tags"
+            exit 1
+          fi
+
+      # metadata-action is kept for the OCI labels only (its tag types are not
+      # used: the tag list comes from the step above).
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.names.outputs.image }}
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-            type=date,format=%Y%m%d
-            type=sha,format=short
           labels: |
             org.opencontainers.image.title=ComfyUI
             org.opencontainers.image.description=ComfyUI + ComfyUI-Manager for Clore.ai
@@ -106,7 +128,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.names.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Single plain manifest: easier to pull from a plain container runtime.
           provenance: false
@@ -123,7 +145,9 @@ jobs:
             echo "### ComfyUI image built"
             echo ""
             echo "- Image : \`${{ steps.names.outputs.image }}\`"
-            echo "- Tags  : ${{ steps.meta.outputs.tags }}"
+            echo "- Tags  : ${{ steps.names.outputs.tags }}"
+            echo "- Date tag : \`${{ steps.names.outputs.date_tag }}\`"
+            echo "- Short sha : \`${{ steps.names.outputs.short_sha }}\`"
             echo "- ComfyUI ref : \`${{ github.event.inputs.comfyui_ref || 'master' }}\`"
             echo "- PyTorch : \`${{ github.event.inputs.pytorch_version || '2.9.1' }}\` (cu128)"
           } >> "$GITHUB_STEP_SUMMARY"
